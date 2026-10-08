@@ -1,0 +1,140 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL with pgvector Extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: eventsphere-postgres
+    environment:
+      POSTGRES_DB: eventsphere
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - eventsphere-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d eventsphere"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. MongoDB Document Store
+  mongodb:
+    image: mongo:7.0
+    container_name: eventsphere-mongo
+    environment:
+      MONGO_INITDB_DATABASE: eventsphere_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./database/mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - mongodata:/data/db
+    networks:
+      - eventsphere-net
+
+  # 3. Redis In-Memory Cache & Session Store
+  redis:
+    image: redis:7.2-alpine
+    container_name: eventsphere-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - eventsphere-net
+
+  # 4. Zookeeper for Kafka Coordination
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: eventsphere-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - eventsphere-net
+
+  # 5. Apache Kafka Message Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: eventsphere-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - eventsphere-net
+
+  # 6. FastAPI AI & RAG Service
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: eventsphere-ai-service
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_NAME=eventsphere
+      - DB_USER=postgres
+      - DB_PASS=password123
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - OTP_EXPIRATION_SECONDS=60
+      - MAX_OTP_ATTEMPTS=5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - eventsphere-net
+
+  # 7. Node.js Real-time Service (WebSockets & Telemetry)
+  realtime-service:
+    build:
+      context: ./node-services
+      dockerfile: Dockerfile
+    container_name: eventsphere-realtime-service
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+    networks:
+      - eventsphere-net
+
+  # 8. React + Vite Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: eventsphere-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8080/api
+      - VITE_AI_URL=http://localhost:8000/api/ai
+    depends_on:
+      - ai-service
+      - realtime-service
+    networks:
+      - eventsphere-net
+
+networks:
+  eventsphere-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  mongodata:
+  redisdata:

@@ -1,0 +1,29 @@
+{
+  "name": "event-sphere",
+  "version": "1.0.0",
+  "description": "Event Sphere — Full-Stack Event Management & Engagement Platform",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:realtime": "npm --prefix node-services start",
+    "dev:ai": "uvicorn app.main:app --app-dir ai-service --host 127.0.0.1 --port 8000 --reload",
+    "build": "npm --prefix frontend run build",
+    "install:all": "npm --prefix frontend install && npm --prefix node-services install",
+    "docker:up": "docker-compose up --build",
+    "docker:down": "docker-compose down"
+  },
+  "keywords": [
+    "event-management",
+    "spring-boot",
+    "fastapi",
+    "rag",
+    "pgvector",
+    "react",
+    "kafka",
+    "realtime",
+    "microservices"
+  ],
+  "author": "Event Sphere Team",
+  "license": "MIT"
+}

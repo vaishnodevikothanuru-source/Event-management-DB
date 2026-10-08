@@ -1,0 +1,55 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+      routes:
+        - id: auth-service
+          uri: http://${AUTH_SERVICE_HOST:localhost}:8081
+          predicates:
+            - Path=/api/auth/**, /api/users/**
+
+        - id: event-service
+          uri: http://${EVENT_SERVICE_HOST:localhost}:8082
+          predicates:
+            - Path=/api/events/**, /api/organizations/**, /api/speakers/**, /api/sessions/**, /api/sponsors/**
+
+        - id: registration-service
+          uri: http://${REGISTRATION_SERVICE_HOST:localhost}:8083
+          predicates:
+            - Path=/api/registrations/**, /api/tickets/**, /api/payments/**, /api/checkin/**
+
+        - id: engagement-service
+          uri: http://${ENGAGEMENT_SERVICE_HOST:localhost}:8084
+          predicates:
+            - Path=/api/polls/**, /api/questions/**, /api/surveys/**, /api/networking/**
+
+        - id: ai-service
+          uri: http://${AI_SERVICE_HOST:localhost}:8000
+          predicates:
+            - Path=/api/ai/**
+
+        - id: realtime-service
+          uri: http://${REALTIME_SERVICE_HOST:localhost}:4000
+          predicates:
+            - Path=/api/realtime/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
